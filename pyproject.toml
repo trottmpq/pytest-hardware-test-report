@@ -1,12 +1,12 @@
 [tool.poetry]
 name = "pytest-hardware-test-report"
-version = "0.1.0"
+version = "0.1.2"
 description = "A simple plugin to use with pytest"
 authors = [
-    "Matthew Trott <trottmpq@fastmail.com>"
+    "Matthew Trott <trottmpq@gmail.com>"
 ]
 maintainers = [
-    "Matthew Trott <trottmpq@fastmail.com>"
+    "Matthew Trott <trottmpq@gmail.com>"
 ]
 readme = "README.md"
 license = "MIT"
@@ -32,7 +32,7 @@ classifiers = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.8.1"
 pytest = "^8.0.0"
 pytest-metadata = "^3.1.1"
 
@@ -43,7 +43,6 @@ optional = true
 black = "^24.1.1"
 flake8 = "^7.0.0"
 isort = "^5.13.2"
-mypy = "^1.8.0"
 pylint = "^3.0.3"
 
 [tool.poetry.group.test]

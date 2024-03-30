@@ -7,7 +7,6 @@ import time
 import warnings
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Any, Generator, Optional
 
 import _pytest.hookspec
 import pytest
@@ -18,7 +17,7 @@ from . import serialize
 
 class JSONReportBase:
 
-    def __init__(self, config: pytest.Config | None = None) -> None:
+    def __init__(self, config=None):
         self._config = config
         self._logger = logging.getLogger()
 
@@ -32,26 +31,24 @@ class JSONReportBase:
         if self._config is None:
             self._config = config
         if not hasattr(config, "hw_report"):
-            self._config.hw_report = self  # type: ignore[attr-defined]
+            self._config.hw_report = self
         # If the user sets --tb=no, always omit the traceback from the report
         if self._config.option.tbstyle == "no" and not self._must_omit("traceback"):
             self._config.option.hw_test_report_omit.append("traceback")
 
-    def pytest_addhooks(self, pluginmanager: pytest.PytestPluginManager) -> None:
+    def pytest_addhooks(self, pluginmanager):
         """Add new hooks"""
         pluginmanager.add_hookspecs(Hooks)
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_protocol(
-        self, item: pytest.Item, nextitem: Optional[pytest.Item]  # pylint: disable=unused-argument
-    ) -> Optional[object]:
+    def pytest_runtest_protocol(self, item, nextitem):  # pylint: disable=unused-argument
         """Add the hw_report_extra attribute to pytest.Item and then clean up after"""
-        item.hw_report_extra = {}  # type: ignore[attr-defined]
+        item.hw_report_extra = {}
         yield
-        del item.hw_report_extra  # type: ignore[attr-defined]
+        del item.hw_report_extra
 
     @contextmanager
-    def _capture_log(self, item: pytest.Item, when: str) -> Generator[None, Any, None]:
+    def _capture_log(self, item, when):
         """Add log to the report"""
         handler = LoggingHandler()
         self._logger.addHandler(handler)
@@ -59,12 +56,12 @@ class JSONReportBase:
             yield
         finally:
             self._logger.removeHandler(handler)
-        item.hw_report_extra[when]["log"] = handler.records  # type: ignore[attr-defined]
+        item.hw_report_extra[when]["log"] = handler.records
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_setup(self, item: pytest.Item) -> Optional[object]:
+    def pytest_runtest_setup(self, item):
         """Add setup to the report. set up log if not omitted"""
-        item.hw_report_extra["setup"] = {}  # type: ignore[attr-defined]
+        item.hw_report_extra["setup"] = {}
         if self._must_omit("log"):
             yield
         else:
@@ -72,9 +69,9 @@ class JSONReportBase:
                 yield
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_call(self, item: pytest.Item) -> Optional[object]:
+    def pytest_runtest_call(self, item):
         """Add call to the report. set up log if not omitted"""
-        item.hw_report_extra["call"] = {}  # type: ignore[attr-defined]
+        item.hw_report_extra["call"] = {}
         if self._must_omit("log"):
             yield
         else:
@@ -82,9 +79,9 @@ class JSONReportBase:
                 yield
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_teardown(self, item: pytest.Item) -> Optional[object]:
+    def pytest_runtest_teardown(self, item):
         """Add teardown to the report. set up log if not omitted"""
-        item.hw_report_extra["teardown"] = {}  # type: ignore[attr-defined]
+        item.hw_report_extra["teardown"] = {}
         if self._must_omit("log"):
             yield
         else:
@@ -92,7 +89,7 @@ class JSONReportBase:
                 yield
 
     @pytest.hookimpl(hookwrapper=True)
-    def pytest_runtest_makereport(self, item: pytest.Item, call: pytest.CallInfo):
+    def pytest_runtest_makereport(self, item, call):
         """Hook runtest_makereport to access the item *and* the report"""
         report = (yield).get_result()
 
@@ -102,26 +99,24 @@ class JSONReportBase:
                 for when_, key, val in item._report_sections
                 if when_ == report.when and key in ["stdout", "stderr"]
             }
-            item.hw_report_extra[call.when].update(streams)  # type: ignore[attr-defined]
+            item.hw_report_extra[call.when].update(streams)
 
         for dict_ in self._config.hook.pytest_json_runtest_metadata(item=item, call=call):
             if not dict_:
                 continue
-            item.hw_report_extra.setdefault("metadata", {}).update(
-                dict_
-            )  # type: ignore[attr-defined]
+            item.hw_report_extra.setdefault("metadata", {}).update(dict_)
         self._validate_metadata(item)
 
         for dict_ in self._config.hook.pytest_json_runtest_dut(item=item, call=call):
             if not dict_:
                 continue
-            item.hw_report_extra.setdefault("DUT", {}).update(dict_)  # type: ignore[attr-defined]
+            item.hw_report_extra.setdefault("DUT", {}).update(dict_)
         self._validate_dut(item)
 
         for dict_ in self._config.hook.pytest_json_runtest_equipment(item=item, call=call):
             if not dict_:
                 continue
-            item.hw_report_extra.setdefault("equipment", {}).update(dict_)  # type: ignore[attr-defined]
+            item.hw_report_extra.setdefault("equipment", {}).update(dict_)
         self._validate_equipment(item)
 
         # Attach the JSON details to the report. If this is an xdist worker,

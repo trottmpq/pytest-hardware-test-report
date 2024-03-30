@@ -2,7 +2,6 @@
     "black-formatter.importStrategy": "fromEnvironment",
     "isort.importStrategy": "fromEnvironment",
     "pylint.importStrategy": "fromEnvironment",
-    "mypy-type-checker.importStrategy": "fromEnvironment",
     "flake8.importStrategy": "fromEnvironment",
     "black-formatter.args": [
         "--line-length=99"

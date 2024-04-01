@@ -13,22 +13,28 @@ It can report a summary, test details, captured output, logs, exception tracebac
 * [Installation](#installation)
 * [Options](#options)
 * [Usage](#usage)
-   * [Metadata](#metadata)
-   * [Modifying the report](#modifying-the-report)
-   * [Direct invocation](#direct-invocation)
-* [Format](#format)
-   * [Summary](#summary)
-   * [Environment](#environment)
-   * [Collectors](#collectors)
-   * [Tests](#tests)
-   * [Test stage](#test-stage)
-   * [Log](#log)
-   * [Warnings](#warnings)
+  * [Fixtures](#fixtures)
+    * [json_dut](#json_dut)
+    * [json_equipment](#json_equipment)
+    * [json_metadata](#json_metadata)
+  * [Advanced Usage](#advanced-usage)
+    * [DUT](#dut)
+    * [Equipment](#equipment)
+    * [Metadata](#metadata)
+    * [Modifying the report](#modifying-the-report)
+  * [Direct invocation](#direct-invocation)
+  * [Format](#format)
+  * [Summary](#summary)
+  * [Environment](#environment)
+  * [Tests](#tests)
+  * [Test stage](#test-stage)
+  * [Log](#log)
+  * [Warnings](#warnings)
 * [Related tools](#related-tools)
 
 ## Installation
 
-```
+```bash
 pip install pytest-hardware-test-report --upgrade 
 ```
 
@@ -56,24 +62,47 @@ $ cat .report.json
 If you just need to know how many tests passed or failed and don't care about details, you can produce a summary only:
 
 ```bash
-$ pytest --json-report --json-report-summary
+pytest --hw-test-report --hw-test-report-summary
 ```
 
 Many fields can be omitted to keep the report size small. E.g., this will leave out keywords and stdout/stderr output:
 
 ```bash
-$ pytest --json-report --json-report-omit keywords streams
+pytest --hw-test-report --hw-test-report-omit keywords streams
 ```
 
 If you don't like to have the report saved, you can specify `none` as the target file name:
 
 ```bash
-$ pytest --json-report --json-report-file none
+pytest --hw-test-report --hw-test-report-file none
 ```
 
-## Advanced usage
+### Fixtures
 
-### Metadata
+#### json_dut
+
+To record information about the device under test in the report you can use the `json_dut` [test fixture](https://docs.pytest.org/en/stable/fixture.html). This also works if your DUT is, itself, a fixture:
+
+```python
+@pytest.fixture(name="dut")
+def dut_fixture(json_dut):
+    json_dut['serial no'] = 1234567
+    json_dut['version'] = 1.0.0
+    dut = setup_dut()
+    yield dut
+    dut.teardown()
+```
+
+#### json_equipment
+
+To record information about any test equipment you may use in the report you can use the `json_equipment` [test fixture](https://docs.pytest.org/en/stable/fixture.html):
+
+```python
+def equipment1(json_equipment):
+    json_equipment['equipment1'] = {'manufacturer': 'Test Inc.', 'Model': 'Testomatic 300'}
+```
+
+#### json_metadata
 
 The easiest way to add your own metadata to a test item is by using the `json_metadata` [test fixture](https://docs.pytest.org/en/stable/fixture.html):
 
@@ -82,6 +111,49 @@ def test_something(json_metadata):
     json_metadata['foo'] = {"some": "thing"}
     json_metadata['bar'] = 123
 ```
+
+## Advanced usage
+
+### Hooks
+
+If you're using a `pytest_json_*` hook although the plugin is not installed or not active (not using `--json-report`), pytest doesn't recognize it and may fail with an internal error like this:
+
+```bash
+INTERNALERROR> pluggy.manager.PluginValidationError: unknown hook 'pytest_json_runtest_metadata' in plugin <module 'conftest' from 'conftest.py'>
+```
+
+You can avoid this by declaring the hook implementation optional:
+
+```python
+import pytest
+@pytest.hookimpl(optionalhook=True)
+def pytest_json_runtest_metadata(item, call):
+    ...
+```
+
+#### DUT
+
+Or use the `pytest_json_runtest_dut` [hook](https://docs.pytest.org/en/stable/reference.html#hooks) (in your `conftest.py`) to add metadata based on the current test run. The dict returned will automatically be merged with any existing metadata. E.g., this adds the start and stop time of each test's `setup` stage:
+
+```python
+def pytest_json_runtest_dut(item, call):
+    if call.when != 'setup':
+        return {}
+    return {'start': call.start, 'stop': call.stop}
+```
+
+#### Equipment
+
+Or use the `pytest_json_runtest_equipment` [hook](https://docs.pytest.org/en/stable/reference.html#hooks) (in your `conftest.py`) to add metadata based on the current test run. The dict returned will automatically be merged with any existing metadata. E.g., this adds the start and stop time of each test's `setup` stage:
+
+```python
+def pytest_json_runtest_equipment(item, call):
+    if call.when != 'setup':
+        return {}
+    return {'start': call.start, 'stop': call.stop}
+```
+
+#### Metadata
 
 Or use the `pytest_json_runtest_metadata` [hook](https://docs.pytest.org/en/stable/reference.html#hooks) (in your `conftest.py`) to add metadata based on the current test run. The dict returned will automatically be merged with any existing metadata. E.g., this adds the start and stop time of each test's `call` stage:
 
@@ -94,22 +166,7 @@ def pytest_json_runtest_metadata(item, call):
 
 Also, you could add metadata using [pytest-metadata's `--metadata` switch](https://github.com/pytest-dev/pytest-metadata#additional-metadata) which will add metadata to the report's `environment` section, but not to a specific test item. You need to make sure all your metadata is JSON-serializable.
 
-### A note on hooks
-
-If you're using a `pytest_json_*` hook although the plugin is not installed or not active (not using `--json-report`), pytest doesn't recognize it and may fail with an internal error like this:
-```
-INTERNALERROR> pluggy.manager.PluginValidationError: unknown hook 'pytest_json_runtest_metadata' in plugin <module 'conftest' from 'conftest.py'>
-```
-You can avoid this by declaring the hook implementation optional:
-
-```python
-import pytest
-@pytest.hookimpl(optionalhook=True)
-def pytest_json_runtest_metadata(item, call):
-    ...
-```
-
-### Modifying the report
+#### Modifying the report
 
 You can modify the entire report before it's saved by using the `pytest_json_modifyreport` hook.
 
@@ -147,7 +204,7 @@ import pytest
 from pytest_htr.plugin import JSONReport
 
 plugin = JSONReport()
-pytest.main(['--json-report-file=none', 'test_foo.py'], plugins=[plugin])
+pytest.main(['--hw-test-report-file=none', 'test_foo.py'], plugins=[plugin])
 ```
 
 You can then access the `report` object:
@@ -162,10 +219,9 @@ And save the report manually:
 plugin.save_report('/tmp/my_report.json')
 ```
 
-
 ## Format
 
-The JSON report contains metadata of the session, a summary, collectors, tests and warnings. You can find a sample report in [`sample_report.json`](sample_report.json).
+The JSON report contains metadata of the session, a summary, tests and warnings. You can find a sample report in [`sample_report.json`](sample_report.json).
 
 | Key | Description |
 | --- | --- |
@@ -175,10 +231,10 @@ The JSON report contains metadata of the session, a summary, collectors, tests a
 | `root` | Absolute root path from which the session was started. |
 | `environment` | [Environment](#environment) entry. |
 | `summary` | [Summary](#summary) entry. |
-| `tests` | [Tests](#tests) entry. (absent if `--json-report-summary`)  |
-| `warnings` | [Warnings](#warnings) entry. (absent if `--json-report-summary` or if no warnings)  |
+| `tests` | [Tests](#tests) entry. (absent if `--hw-test-report-summary`)  |
+| `warnings` | [Warnings](#warnings) entry. (absent if `--hw-test-report-summary` or if no warnings)  |
 
-#### Example
+### Format Example
 
 ```python
 {
@@ -193,7 +249,7 @@ The JSON report contains metadata of the session, a summary, collectors, tests a
 }
 ```
 
-### Summary
+## Summary
 
 Number of outcomes per category and the total number of test items.
 
@@ -204,7 +260,7 @@ Number of outcomes per category and the total number of test items.
 |  `deselected` | Total number of tests deselected. (absent if number is 0) |
 | `<outcome>` | Number of tests with that outcome. (absent if number is 0) |
 
-#### Example
+### Summary Example
 
 ```python
 {
@@ -219,11 +275,11 @@ Number of outcomes per category and the total number of test items.
 }
 ```
 
-### Environment
+## Environment
 
 The environment section is provided by [pytest-metadata](https://github.com/pytest-dev/pytest-metadata). All metadata given by that plugin will be added here, so you need to make sure it is JSON-serializable.
 
-#### Example
+### Environment Example
 
 ```python
 {
@@ -245,7 +301,7 @@ The environment section is provided by [pytest-metadata](https://github.com/pyte
 }
 ```
 
-### Tests
+## Tests
 
 A list of test nodes. Each completed test stage produces a stage object (`setup`, `call`, `teardown`) with its own `outcome`.
 
@@ -258,7 +314,7 @@ A list of test nodes. Each completed test stage produces a stage object (`setup`
 | `{setup, call, teardown}` | [Test stage](#test-stage) entry. To find the error in a failed test you need to check all stages. (absent if stage didn't run) |
 | `metadata` | [Metadata](#metadata) item. (absent if no metadata) |
 
-#### Example
+### Tests Example
 
 ```python
 [
@@ -287,8 +343,7 @@ A list of test nodes. Each completed test stage produces a stage object (`setup`
 ]
 ```
 
-
-### Test stage
+## Test stage
 
 A test stage item.
 
@@ -303,7 +358,7 @@ A test stage item.
 | `log` | [Log](#log) entry. (absent if none available) |
 | `longrepr` | Representation of the error. (absent if no error occurred; format affected by `--tb` option) |
 
-#### Example
+### Test stage Example
 
 ```python
 {
@@ -343,13 +398,13 @@ A test stage item.
 }
 ```
 
-### Log
+## Log
 
 A list of log records. The fields of a log record are the [`logging.LogRecord` attributes](https://docs.python.org/3/library/logging.html#logrecord-attributes), with the exception that the fields `exc_info` and `args` are always empty and `msg` contains the formatted log message.
 
 You can apply [`logging.makeLogRecord()`](https://docs.python.org/3/library/logging.html#logging.makeLogRecord)  on a log record to convert it back to a `logging.LogRecord` object.
 
-#### Example
+### Log Example
 
 ```python
 [
@@ -379,8 +434,7 @@ You can apply [`logging.makeLogRecord()`](https://docs.python.org/3/library/logg
 ]
 ```
 
-
-### Warnings
+## Warnings
 
 A list of warnings that occurred during the session. (See the [pytest docs on warnings](https://docs.pytest.org/en/latest/warnings.html).)
 
@@ -391,7 +445,7 @@ A list of warnings that occurred during the session. (See the [pytest docs on wa
 | `message` | Warning message. |
 | `when` | When the warning was captured. (`"config"`, `"collect"` or `"runtest"` as listed [here](https://docs.pytest.org/en/latest/reference.html#_pytest.hookspec.pytest_warning_captured)) |
 
-#### Example
+### Warnings Example
 
 ```python
 [
@@ -406,8 +460,8 @@ A list of warnings that occurred during the session. (See the [pytest docs on wa
 
 ## Related tools
 
--[pytest-json-report](https://github.com/numirias/pytest-json-report) Heavily inspired by this plugin. It is more suited for pure software testing but i have borrow large ammounts of code from there.
+* [pytest-json-report](https://github.com/numirias/pytest-json-report) Heavily inspired by this plugin. It is more suited for pure software testing but i have borrow large ammounts of code from there.
 
-- [pytest-json](https://github.com/mattcl/pytest-json) has some great features but appears to be unmaintained. I borrowed some ideas and test cases from there.
+* [pytest-json](https://github.com/mattcl/pytest-json) has some great features but appears to be unmaintained. I borrowed some ideas and test cases from there.
 
-- [tox has a switch](http://tox.readthedocs.io/en/latest/example/result.html) to create a JSON report including a test result summary. However, it just provides the overall outcome without any per-test details.
+* [tox has a switch](http://tox.readthedocs.io/en/latest/example/result.html) to create a JSON report including a test result summary. However, it just provides the overall outcome without any per-test details.

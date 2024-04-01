@@ -232,7 +232,7 @@ def test_no_streams(pytester):
 
 def test_summary_only(pytester):
     pytester.makepyfile(FILE)
-    pytester.runpytest("--hw-test-report", "--json-report-summary")
+    pytester.runpytest("--hw-test-report", "--hw-test-report-summary")
     with open(pytester.path / ".report.json", encoding="utf-8") as f:
         data = json.load(f)
     assert "summary" in data

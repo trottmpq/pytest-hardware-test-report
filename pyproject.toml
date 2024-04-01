@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pytest-hardware-test-report"
-version = "0.2.0"
+version = "0.2.1"
 description = "A simple plugin to use with pytest"
 authors = [
     "Matthew Trott <trottmpq@gmail.com>"
@@ -9,7 +9,7 @@ maintainers = [
     "Matthew Trott <trottmpq@gmail.com>"
 ]
 readme = "README.md"
-license = "MIT"
+license = "LICENSE"
 packages = [
     {include = "pytest_htr"}
 ]

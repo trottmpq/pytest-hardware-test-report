@@ -246,9 +246,7 @@ class JSONReport(JSONReportBase):
             environment=self._config.stash.get(metadata_key, {}),
             summary=serialize.make_summary(self._json_tests, **summary_data),
         )
-        if not self._config.option.json_report_summary:
-            # if self._json_collectors:
-            #     json_report["collectors"] = self._json_collectors
+        if not self._config.option.hw_test_report_summary:
             json_report["tests"] = list(self._json_tests.values())
             if self._json_warnings:
                 json_report["warnings"] = self._json_warnings
@@ -438,7 +436,7 @@ def pytest_addoption(parser):
         "(choose from: log, traceback, streams, warnings)",
     )
     group.addoption(
-        "--json-report-summary",
+        "--hw-test-report-summary",
         default=False,
         action="store_true",
         help="only create a summary without per-test details",

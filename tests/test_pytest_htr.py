@@ -3,6 +3,7 @@
 import json
 import logging
 import pathlib
+import sys
 
 import pytest
 
@@ -161,13 +162,25 @@ def test_report_crash_and_traceback(pytester):
     assert call["crash"]["path"].endswith("test_report_crash_and_traceback.py")
     assert call["crash"]["lineno"] == 55
     assert call["crash"]["message"].startswith("TypeError: unsupported ")
-    traceback = [
-        {"path": "test_report_crash_and_traceback.py", "lineno": 66, "message": ""},
-        {"path": "test_report_crash_and_traceback.py", "lineno": 64, "message": "in foo"},
-        {"path": "test_report_crash_and_traceback.py", "lineno": 64, "message": "in <listcomp>"},
-        {"path": "test_report_crash_and_traceback.py", "lineno": 60, "message": "in bar"},
-        {"path": "test_report_crash_and_traceback.py", "lineno": 55, "message": "TypeError"},
-    ]
+    if sys.version_info.minor < 12:
+        traceback = [
+            {"path": "test_report_crash_and_traceback.py", "lineno": 66, "message": ""},
+            {"path": "test_report_crash_and_traceback.py", "lineno": 64, "message": "in foo"},
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 64,
+                "message": "in <listcomp>",
+            },
+            {"path": "test_report_crash_and_traceback.py", "lineno": 60, "message": "in bar"},
+            {"path": "test_report_crash_and_traceback.py", "lineno": 55, "message": "TypeError"},
+        ]
+    else:
+        traceback = [
+            {"path": "test_report_crash_and_traceback.py", "lineno": 66, "message": ""},
+            {"path": "test_report_crash_and_traceback.py", "lineno": 64, "message": "in foo"},
+            {"path": "test_report_crash_and_traceback.py", "lineno": 60, "message": "in bar"},
+            {"path": "test_report_crash_and_traceback.py", "lineno": 55, "message": "TypeError"},
+        ]
     assert call["traceback"] == traceback
 
 

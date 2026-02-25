@@ -70,7 +70,10 @@ def test_terminal_summary(pytester):
     res.stdout.fnmatch_lines(["-*JSON report*-"])
 
     res = pytester.runpytest(
-        "--hw-test-report", "--hw-test-report-file=NONE", "-vv", "--hw-test-report-verbosity=0"
+        "--hw-test-report",
+        "--hw-test-report-file=NONE",
+        "-vv",
+        "--hw-test-report-verbosity=0",
     )
     res.stdout.no_fnmatch_line("-*JSON report*-")
 
@@ -165,21 +168,45 @@ def test_report_crash_and_traceback(pytester):
     if sys.version_info.minor < 12:
         traceback = [
             {"path": "test_report_crash_and_traceback.py", "lineno": 66, "message": ""},
-            {"path": "test_report_crash_and_traceback.py", "lineno": 64, "message": "in foo"},
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 64,
+                "message": "in foo",
+            },
             {
                 "path": "test_report_crash_and_traceback.py",
                 "lineno": 64,
                 "message": "in <listcomp>",
             },
-            {"path": "test_report_crash_and_traceback.py", "lineno": 60, "message": "in bar"},
-            {"path": "test_report_crash_and_traceback.py", "lineno": 55, "message": "TypeError"},
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 60,
+                "message": "in bar",
+            },
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 55,
+                "message": "TypeError",
+            },
         ]
     else:
         traceback = [
             {"path": "test_report_crash_and_traceback.py", "lineno": 66, "message": ""},
-            {"path": "test_report_crash_and_traceback.py", "lineno": 64, "message": "in foo"},
-            {"path": "test_report_crash_and_traceback.py", "lineno": 60, "message": "in bar"},
-            {"path": "test_report_crash_and_traceback.py", "lineno": 55, "message": "TypeError"},
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 64,
+                "message": "in foo",
+            },
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 60,
+                "message": "in bar",
+            },
+            {
+                "path": "test_report_crash_and_traceback.py",
+                "lineno": 55,
+                "message": "TypeError",
+            },
         ]
     assert call["traceback"] == traceback
 
@@ -346,7 +373,8 @@ def test_json_dut(pytester):
     assert "DUT" not in tests["empty_dut"]
     assert "DUT" not in tests["unserializable_dut"]
     assert len(data["warnings"]) == 1 and (
-        "test_unserializable_dut is not JSON-serializable" in data["warnings"][0]["message"]
+        "test_unserializable_dut is not JSON-serializable"
+        in data["warnings"][0]["message"]
     )
     assert tests["multi_stage_dut"]["DUT"] == {"a": 1, "b": 2, "c": 3}
 
@@ -407,7 +435,8 @@ def test_json_equipment(pytester):
     assert "equipment" not in tests["empty_equipment"]
     assert "equipment" not in tests["unserializable_equipment"]
     assert len(data["warnings"]) == 1 and (
-        "test_unserializable_equipment is not JSON-serializable" in data["warnings"][0]["message"]
+        "test_unserializable_equipment is not JSON-serializable"
+        in data["warnings"][0]["message"]
     )
     assert tests["multi_stage_equipment"]["equipment"] == {"a": 1, "b": 2, "c": 3}
 
@@ -468,7 +497,8 @@ def test_json_metadata(pytester):
     assert "metadata" not in tests["empty_metadata"]
     assert "metadata" not in tests["unserializable_metadata"]
     assert len(data["warnings"]) == 1 and (
-        "test_unserializable_metadata is not JSON-serializable" in data["warnings"][0]["message"]
+        "test_unserializable_metadata is not JSON-serializable"
+        in data["warnings"][0]["message"]
     )
     assert tests["multi_stage_metadata"]["metadata"] == {"a": 1, "b": 2, "c": 3}
 
@@ -826,6 +856,50 @@ def test_handle_deselection(pytester):
     # *collected* but still explicitly *deselected*, so we assert there is no
     # internal error caused by trying to access the collector obj.
     assert pytester.runpytest("--hw-test-report", "--last-failed", fn).ret == 1
+
+
+def test_numpy_serialization(pytester):
+    pytest.importorskip("numpy")
+    pytester.makepyfile(
+        """
+        import numpy as np
+
+        def test_numpy_metadata(json_metadata):
+            json_metadata['array'] = np.array([1, 2, 3])
+            json_metadata['int'] = np.int64(42)
+            json_metadata['float'] = np.float64(3.14)
+            json_metadata['bool'] = np.bool_(True)
+
+        def test_numpy_dut(json_dut):
+            json_dut['measurements'] = np.array([0.1, 0.2, 0.3])
+            json_dut['count'] = np.int32(7)
+
+        def test_numpy_equipment(json_equipment):
+            json_equipment['calibration'] = np.array([10.0, 20.0])
+            json_equipment['gain'] = np.float32(1.5)
+    """
+    )
+    pytester.runpytest("-vv", "--hw-test-report")
+    with open(pytester.path / ".report.json", encoding="utf-8") as f:
+        data = json.load(f)
+
+    tests = {test["nodeid"].split("::")[-1][5:]: test for test in data["tests"]}
+
+    # ndarray and scalar numpy types in metadata
+    assert tests["numpy_metadata"]["metadata"]["array"] == [1, 2, 3]
+    assert tests["numpy_metadata"]["metadata"]["int"] == 42
+    assert tests["numpy_metadata"]["metadata"]["float"] == pytest.approx(3.14)
+    assert tests["numpy_metadata"]["metadata"]["bool"] is True
+
+    # ndarray and integer scalar in DUT
+    assert tests["numpy_dut"]["DUT"]["measurements"] == pytest.approx([0.1, 0.2, 0.3])
+    assert tests["numpy_dut"]["DUT"]["count"] == 7
+
+    # ndarray and float scalar in equipment
+    assert tests["numpy_equipment"]["equipment"]["calibration"] == pytest.approx(
+        [10.0, 20.0]
+    )
+    assert tests["numpy_equipment"]["equipment"]["gain"] == pytest.approx(1.5)
 
 
 @pytest.mark.parametrize("num_processes", [1, 4])

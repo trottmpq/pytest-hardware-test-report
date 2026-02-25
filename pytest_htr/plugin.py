@@ -16,7 +16,6 @@ from . import serialize
 
 
 class JSONReportBase:
-
     def __init__(self, config=None):
         self._config = config
         self._logger = logging.getLogger()
@@ -113,7 +112,9 @@ class JSONReportBase:
             item.hw_report_extra.setdefault("DUT", {}).update(dict_)
         self._validate_dut(item)
 
-        for dict_ in self._config.hook.pytest_json_runtest_equipment(item=item, call=call):
+        for dict_ in self._config.hook.pytest_json_runtest_equipment(
+            item=item, call=call
+        ):
             if not dict_:
                 continue
             item.hw_report_extra.setdefault("equipment", {}).update(dict_)
@@ -210,10 +211,14 @@ class JSONReport(JSONReportBase):
 
         # Update total test outcome, if necessary. The total outcome can be
         # different from the outcome of the setup/call/teardown stage.
-        outcome = self._config.hook.pytest_report_teststatus(report=report, config=self._config)[0]
+        outcome = self._config.hook.pytest_report_teststatus(
+            report=report, config=self._config
+        )[0]
         if outcome not in ["passed", ""]:
             json_testitem["outcome"] = outcome
-        json_testitem[report.when] = self._config.hook.pytest_json_runtest_stage(report=report)
+        json_testitem[report.when] = self._config.hook.pytest_json_runtest_stage(
+            report=report
+        )
 
     @pytest.hookimpl(trylast=True)
     def pytest_json_runtest_stage(self, report):
@@ -232,8 +237,7 @@ class JSONReport(JSONReportBase):
         summary_data = {
             # Need to add deselected count to get correct number of collected
             # tests (see pytest-dev/pytest#9614)
-            "collected": session.testscollected
-            + self._num_deselected
+            "collected": session.testscollected + self._num_deselected
         }
         if self._num_deselected:
             summary_data["deselected"] = self._num_deselected
@@ -284,7 +288,7 @@ class JSONReport(JSONReportBase):
             json.dump(
                 self.report,
                 f,
-                default=str,
+                cls=serialize.NumpyEncoder,
                 indent=self._config.option.hw_test_report_indent,
             )
 
@@ -313,12 +317,10 @@ class JSONReport(JSONReportBase):
 
 
 class JSONReportWorker(JSONReportBase):
-
     pass
 
 
 class LoggingHandler(logging.Handler):
-
     def __init__(self):
         super().__init__()
         self.records = []
@@ -333,7 +335,6 @@ class LoggingHandler(logging.Handler):
 
 
 class Hooks:
-
     def pytest_json_modifyreport(self, json_report):
         """Called after building JSON report and before saving it.
 
@@ -419,14 +420,17 @@ def json_equipment(request):
 def pytest_addoption(parser):
     group = parser.getgroup("hwtestreport", "reporting test results as JSON")
     group.addoption(
-        "--hw-test-report", default=False, action="store_true", help="create JSON report"
+        "--hw-test-report",
+        default=False,
+        action="store_true",
+        help="create JSON report",
     )
     group.addoption(
         "--hw-test-report-file",
         default=".report.json",
         # The case-insensitive string "none" will make the value None
         type=lambda x: None if x.lower() == "none" else x,
-        help='target path to save JSON report (use "none" to not save the ' "report)",
+        help='target path to save JSON report (use "none" to not save the report)',
     )
     group.addoption(
         "--hw-test-report-omit",

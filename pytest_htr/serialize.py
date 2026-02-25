@@ -1,15 +1,31 @@
-"""Functions for making test data JSON-serializable.
-
-"""
+"""Functions for making test data JSON-serializable."""
 
 import json
 from collections import Counter
+
+try:
+    import numpy as np
+
+    class NumpyEncoder(json.JSONEncoder):
+        def default(self, obj):
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+            if isinstance(obj, np.integer):
+                return int(obj)
+            if isinstance(obj, np.floating):
+                return float(obj)
+            if isinstance(obj, np.bool_):
+                return bool(obj)
+            return super().default(obj)
+
+except ImportError:
+    NumpyEncoder = json.JSONEncoder
 
 
 def serializable(obj):
     """Return whether `obj` is JSON-serializable."""
     try:
-        json.dumps(obj)
+        json.dumps(obj, cls=NumpyEncoder)
     except (TypeError, OverflowError):
         return False
     return True
@@ -67,7 +83,8 @@ def make_teststage(report, stdout, stderr, log, omit_traceback):
         if not omit_traceback:
             try:
                 stage["traceback"] = [
-                    make_fileloc(x.reprfileloc) for x in report.longrepr.reprtraceback.reprentries
+                    make_fileloc(x.reprfileloc)
+                    for x in report.longrepr.reprtraceback.reprentries
                 ]
             except AttributeError:
                 # Happens if no detailed tb entries are available (e.g. due to
